@@ -3,10 +3,10 @@ services:
     image: mysql:8.0
     container_name: aist_mysql_db
     restart: always
-    # expose:
-    #   - "3306"
-    ports:
-      - "3310:3306"
+    expose:
+      - "3306"
+    # ports:
+    #   - "3310:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "root_aist_password123@!!!@*^%123"
       MYSQL_DATABASE: aist_db
