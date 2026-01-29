@@ -48,7 +48,7 @@ services:
     image: nginx:latest
     container_name: aist_nginx_server
     restart: always
-    expose:
+    ports:
       - "8080:80"
     volumes:
       - ./laravel:/var/www
