@@ -1,0 +1,66 @@
+name: RTC Deployment-Only Get Latest
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Which branch to deploy'
+        required: true
+        default: 'second_development'
+        type: choice
+        options:
+          - second_development
+          - master
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, rtc_runner]
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Sync project folder (exclude certbot)
+        run: |
+          RUNNER_WORK_DIR="${{ github.workspace }}"
+          PROJECT_DIR="/home/rtc-admin/RTC-Project-Backend"
+          rsync -av --exclude='.git' "$RUNNER_WORK_DIR/" "$PROJECT_DIR/"
+          echo "Project folder synced from runner checkout."
+        working-directory: ${{ github.workspace }}
+
+      - name: Build & Run containers
+        run: docker compose -f docker-compose.prod.yml restart
+        working-directory: /home/rtc-admin/RTC-Project-Backend
+      
+      - name: Wait for database
+        run: |
+          until docker compose exec db mysqladmin ping -h "localhost" --silent; do
+            echo "Waiting for MySQL..."
+            sleep 5
+          done
+
+
+      - name: Run database migrations
+        run: docker compose exec app php artisan migrate --force
+       
+
+      - name: Clear Laravel cache
+        run: |
+            docker compose exec app php artisan optimize:clear
+
+      - name: Create storage symlink
+        run: docker compose exec app php artisan storage:link
+      - name: Start Cron Service
+        run: docker compose exec app service cron start

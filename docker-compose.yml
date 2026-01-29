@@ -1,0 +1,96 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        UID: 1000 # your host UID
+        GID: 1000 # your host GID
+
+    container_name: rtc_app
+    working_dir: /var/www
+
+    volumes:
+      - ./laravel:/var/www
+      - ./laravel/.env.example:/var/www/.env
+      - storage_data:/var/www/storage # same volume for serving files
+      - ./php.ini:/usr/local/etc/php/php.ini
+      - /var/run/docker.sock:/var/run/docker.sock
+    # command: /bin/sh -c "php artisan optimize && php-fpm -F"
+
+    networks:
+      - laravel
+  webserver:
+    image: nginx:latest
+    container_name: rtc_nginx_server
+    ports:
+      - "8000:80"
+    volumes:
+      - ./laravel:/var/www
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - storage_data:/var/www/storage
+    networks:
+      - laravel
+  db:
+    image: mysql:8.0
+    container_name: rtc_mysql_db
+    ports:
+      - "3310:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: laravel
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: laravel
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - laravel
+  # mailserver:
+  #   image: ghcr.io/docker-mailserver/docker-mailserver:latest
+  #   container_name: mailserver
+
+  #   # Provide the FQDN of your mail server here (Your DNS MX record should point to this value)
+  #   hostname: mail
+  #   domainname: rtc-bb.camai.kh
+  #   ports:
+  #     - "25:25" # SMTP  (explicit TLS => STARTTLS, Authentication is DISABLED => use port 465/587 instead)
+  #     - "143:143" # IMAP4 (explicit TLS => STARTTLS)
+  #     - "465:465" # ESMTP (implicit TLS)
+  #     - "587:587" # ESMTP (explicit TLS => STARTTLS)
+  #     - "993:993" # IMAP4 (implicit TLS)
+
+  #   volumes:
+  #     - ./docker-data/dms/mail-data/:/var/mail/
+  #     - ./docker-data/dms/mail-state/:/var/mail-state/
+  #     - ./docker-data/dms/mail-logs/:/var/log/mail/
+  #     - ./docker-data/dms/config/:/tmp/docker-mailserver/
+  #     - /etc/localtime:/etc/localtime:ro
+
+  #   restart: always
+  #   stop_grace_period: 1m
+
+  #   healthcheck:
+  #     test: "ss --listening --ipv4 --tcp | grep --silent ':smtp' || exit 1"
+  #     timeout: 3s
+  #     retries: 0
+
+  #   networks:
+  #     - laravel
+  # mailpit:
+  #   image: axllent/mailpit
+  #   container_name: mailpit
+  #   ports:
+  #     - "8025:8025" # Web UI
+  #     - "1025:1025" # SMTP
+  #   networks:
+  #     - laravel
+
+networks:
+  laravel:
+    driver: bridge
+
+volumes:
+  storage_data:
+    name: rtc_storage_data
+  db_data:
+    name: rtc_db_data

@@ -1,0 +1,26 @@
+name: Restart Server
+on:
+  workflow_dispatch: 
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Restart Docker Service
+        run: docker-compose restart
+      - name: Restart Container
+        run: docker restart rtc_app
+      - name: Optimize Container
+        run: docker exec rtc_app php artisan optimize:clear
+      
+        

@@ -1,0 +1,84 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: rtc_mysql_db
+    restart: always
+    # expose:
+    #   - "3306"
+    ports:
+      - "3310:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "root_rtc_bb_password123@!!!@*^%123"
+      MYSQL_DATABASE: rtc_bb_db
+      MYSQL_USER: rtc_bb_user
+      MYSQL_PASSWORD: "rtc_bb_password123@!!!@*^%123"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - rtc_net
+  app:
+    build:
+      context: .
+    container_name: rtc_app
+    restart: always
+    working_dir: /var/www
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - ./laravel:/var/www
+      - /var/www/vendor
+      - /var/www/resources/views
+      - ./laravel/.env.prod:/var/www/.env
+      - ./php.ini:/usr/local/etc/php/php.ini
+      - storage_data:/var/www/storage   
+      # - laravel_storage:/var/www/storage
+    # Remove empty command if not needed
+    # command: /bin/sh -c "service cron start && php artisan optimize && php-fpm -F"
+    command: sh -c "cron && php-fpm -F"  # keeps the container running
+    networks:
+      - rtc_net
+  webserver:
+    image: nginx:latest
+    container_name: rtc_nginx_server
+    restart: always
+    expose:
+      - "80"  # Only expose internally, not to host
+    volumes:
+      - ./laravel:/var/www
+      - storage_data:/var/www/storage   # same volume for serving files
+      - ./nginx.prod.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - rtc_net
+
+  caddy:
+    image: caddy:latest
+    container_name: rtc_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - rtc_net
+  
+    
+
+networks:
+  rtc_net:
+    external: true
+
+volumes:
+  storage_data:
+  db_data:
+  caddy_data:
+  caddy_config:

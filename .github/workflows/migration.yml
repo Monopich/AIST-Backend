@@ -1,0 +1,27 @@
+name: Migrate database
+
+on:
+  workflow_dispatch: # manual trigger
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Run migration
+        run: docker exec rtc_app php artisan migrate --force
+      - name: Clear Laravel cache
+        run: |
+          docker exec rtc_app php artisan config:clear
+          docker exec rtc_app php artisan cache:clear
+          docker exec rtc_app php artisan route:clear
+

@@ -1,0 +1,81 @@
+FROM php:8.2-fpm
+
+# Arguments for user mapping
+ARG UID=1000
+ARG GID=1000
+ARG DOCKER_GID=999
+
+RUN apt-get update && apt-get install -y \
+    unzip \
+    curl \
+    git \
+    nodejs \
+    npm \
+    libzip-dev \
+    libicu-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libmagickwand-dev \
+    zip \
+    cron \
+    procps \
+    --no-install-recommends \
+    && pecl install imagick \
+    && docker-php-ext-enable imagick \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
+        pdo \
+        pdo_mysql \
+        zip \
+        intl \
+        gd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install composer
+RUN curl -sS https://getcomposer.org/installer | php \
+    && mv composer.phar /usr/local/bin/composer
+
+# Install Docker CLI
+RUN curl -fsSL https://get.docker.com | sh
+
+# Configure www-data user with host UID/GID
+RUN groupmod -o -g ${GID} www-data \
+    && usermod -o -u ${UID} -g www-data www-data
+
+# Add www-data to docker group
+RUN groupadd -g ${DOCKER_GID} docker 2>/dev/null || true \
+    && usermod -aG ${DOCKER_GID} www-data
+
+# Set home directory for www-data
+RUN usermod -d /home/www-data www-data \
+    && mkdir -p /home/www-data/.config/psysh \
+    && chown -R www-data:www-data /home/www-data
+
+WORKDIR /var/www
+
+# Copy Laravel (preserve ownership)
+COPY --chown=www-data:www-data ./laravel ./
+
+# Install Laravel dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Prepare Laravel storage/cache
+RUN mkdir -p storage bootstrap/cache public/storage \
+    && chown -R www-data:www-data storage bootstrap/cache public/storage \
+    && chmod -R 775 storage bootstrap/cache public/storage
+
+# Create psysh config for tinker
+RUN mkdir -p /var/www/.config/psysh \
+    && chown -R www-data:www-data /var/www/.config
+
+# Switch to www-data
+USER www-data
+
+# Ensure Laravel storage link exists
+RUN php artisan storage:link || true
+
+EXPOSE 9000
+
+# Run schedule worker and PHP-FPM
+CMD ["sh", "-c", "php /var/www/artisan schedule:work & php-fpm -F"]
