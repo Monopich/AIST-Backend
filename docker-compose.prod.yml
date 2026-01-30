@@ -21,7 +21,7 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - rtc_net
-  app:
+  myApp:
     build:
       context: .
     container_name: aist_app
