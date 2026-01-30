@@ -44,7 +44,7 @@ services:
     command: sh -c "cron && php-fpm -F"  # keeps the container running
     networks:
       - rtc_net
-  webserver:
+  aist_webserver:
     image: nginx:latest
     container_name: aist_nginx_server
     restart: always
